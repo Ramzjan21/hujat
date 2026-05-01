@@ -5,8 +5,8 @@ import { ArrowLeft, AlertTriangle, ShieldAlert, Eye } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import './ViewerPage.css';
 
-// Set PDF.js worker path
-pdfjsLib.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL}/pdf.worker.min.js`;
+// Set PDF.js worker path — CDN dan yuklanadi
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const BACKEND_BASE = '';
 
