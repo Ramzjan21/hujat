@@ -2,8 +2,7 @@
   "name": "hujat-fullstack",
   "version": "1.0.0",
   "scripts": {
-    "build": "cd frontend && npm install && npm run build",
-    "start": "cd backend && npm install && node server.js",
-    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+    "build": "npm install --prefix frontend && npm run build --prefix frontend",
+    "start": "npm install --prefix backend && node backend/server.js"
   }
 }
