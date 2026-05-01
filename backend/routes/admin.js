@@ -1,12 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const fs = require('fs');
-const path = require('path');
 const Document = require('../models/Document');
 const User = require('../models/User');
 const ActivityLog = require('../models/ActivityLog');
 const { protect, adminOnly } = require('../middleware/auth');
-const { upload, UPLOAD_DIR } = require('../middleware/upload');
+const { upload, generateFilename } = require('../middleware/upload');
 
 // All admin routes require authentication AND admin role
 router.use(protect, adminOnly);
@@ -36,10 +34,11 @@ router.patch('/users/:id/toggle', async (req, res) => {
   }
 });
 
-// GET /api/admin/documents - list all documents
+// GET /api/admin/documents - list all documents (fileData excluded)
 router.get('/documents', async (req, res) => {
   try {
     const documents = await Document.find({})
+      .select('-fileData')
       .populate('uploadedBy', 'name email')
       .populate('allowedUsers', 'name email')
       .sort({ createdAt: -1 });
@@ -59,8 +58,6 @@ router.post('/documents/upload', upload.single('file'), async (req, res) => {
     const { title, description, allowedUsers, expiresAt } = req.body;
 
     if (!title) {
-      // Clean up uploaded file if validation fails
-      fs.unlinkSync(req.file.path);
       return res.status(400).json({ error: 'Document title is required.' });
     }
 
@@ -85,7 +82,8 @@ router.post('/documents/upload', upload.single('file'), async (req, res) => {
     const document = await Document.create({
       title,
       description: description || '',
-      storedFilename: req.file.filename, // UUID-based filename
+      fileData: req.file.buffer,
+      storedFilename: generateFilename(req.file.originalname),
       originalFilename: req.file.originalname,
       mimeType: req.file.mimetype,
       fileSize: req.file.size,
@@ -98,10 +96,6 @@ router.post('/documents/upload', upload.single('file'), async (req, res) => {
 
     res.status(201).json({ message: 'Document uploaded successfully.', document });
   } catch (err) {
-    // Clean up file on error
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
     console.error('Upload error:', err);
     res.status(500).json({ error: 'Failed to upload document.' });
   }
@@ -140,16 +134,8 @@ router.patch('/documents/:id', async (req, res) => {
 // DELETE /api/admin/documents/:id - permanently delete document
 router.delete('/documents/:id', async (req, res) => {
   try {
-    const doc = await Document.findById(req.params.id);
+    const doc = await Document.findByIdAndDelete(req.params.id);
     if (!doc) return res.status(404).json({ error: 'Document not found.' });
-
-    // Remove physical file from secure storage
-    const filePath = path.join(UPLOAD_DIR, doc.storedFilename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-
-    await Document.findByIdAndDelete(req.params.id);
     res.json({ message: 'Document deleted.' });
   } catch (err) {
     console.error('Delete document error:', err);

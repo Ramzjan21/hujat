@@ -12,7 +12,12 @@ const documentSchema = new mongoose.Schema({
     trim: true,
     maxlength: [1000, 'Description too long'],
   },
-  // Stored filename on disk (UUID-based, NOT original name for security)
+  // File content stored in MongoDB (no disk needed for Render)
+  fileData: {
+    type: Buffer,
+    required: true,
+  },
+  // Stored filename (UUID-based, for reference)
   storedFilename: {
     type: String,
     required: true,
@@ -43,7 +48,7 @@ const documentSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  // List of users who have access
+  // List of users who have access (empty = public)
   allowedUsers: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

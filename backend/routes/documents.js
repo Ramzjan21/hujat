@@ -1,10 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const path = require('path');
-const fs = require('fs');
 const Document = require('../models/Document');
 const ActivityLog = require('../models/ActivityLog');
-const { UPLOAD_DIR } = require('../middleware/upload');
 
 // GET /api/documents - barcha aktiv hujjatlarni qaytarish (auth yo'q)
 router.get('/', async (req, res) => {
@@ -51,45 +48,30 @@ router.get('/:id/info', async (req, res) => {
   }
 });
 
-// GET /api/documents/:id/view - faylni xavfsiz stream qilish (auth yo'q)
+// GET /api/documents/:id/view - faylni MongoDB dan xavfsiz berish (auth yo'q)
 router.get('/:id/view', async (req, res) => {
   try {
-    const doc = await Document.findById(req.params.id);
+    const doc = await Document.findById(req.params.id).select('+fileData');
 
     if (!doc) return res.status(404).json({ error: 'Document not found.' });
     if (!doc.isActive || doc.isExpired) return res.status(403).json({ error: 'Document is not available.' });
-
-    // Build secure file path - use stored UUID filename, NEVER user input
-    const filePath = path.join(UPLOAD_DIR, doc.storedFilename);
-
-    // Verify file exists on disk
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not found on server.' });
-    }
+    if (!doc.fileData) return res.status(404).json({ error: 'File data not found.' });
 
     // Increment view counter
     await Document.findByIdAndUpdate(doc._id, { $inc: { viewCount: 1 } });
 
     // Set anti-download headers
     res.setHeader('Content-Type', doc.mimeType);
-    res.setHeader('Content-Disposition', 'inline'); // Show inline, not download
+    res.setHeader('Content-Length', doc.fileData.length);
+    res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    // Prevent embedding in other origins
     res.setHeader('X-Frame-Options', 'DENY');
-    // Do NOT set Content-Disposition: attachment - that would trigger download
 
-    // Stream file content - never expose raw file path to client
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.on('error', (err) => {
-      console.error('File stream error:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Error reading file.' });
-      }
-    });
-    fileStream.pipe(res);
+    // Send buffer directly from MongoDB
+    res.end(doc.fileData);
   } catch (err) {
     console.error('Document view error:', err);
     res.status(500).json({ error: 'Failed to serve document.' });

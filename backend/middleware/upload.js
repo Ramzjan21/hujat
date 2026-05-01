@@ -1,15 +1,6 @@
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-
-// Secure upload directory - OUTSIDE public folder
-const UPLOAD_DIR = path.join(__dirname, '..', 'secure_storage');
-
-// Ensure directory exists on startup
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+const path = require('path');
 
 // Allowed MIME types
 const ALLOWED_TYPES = [
@@ -21,26 +12,17 @@ const ALLOWED_TYPES = [
   'text/plain',
 ];
 
-// Max file size: 50MB
-const MAX_SIZE = 50 * 1024 * 1024;
+// Max file size: 16MB (MongoDB document limit)
+const MAX_SIZE = 16 * 1024 * 1024;
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (req, file, cb) => {
-    // Use UUID as filename - never expose original name on disk
-    const ext = path.extname(file.originalname).toLowerCase();
-    const safeExt = ext.replace(/[^a-z0-9.]/g, ''); // Sanitize extension
-    cb(null, `${uuidv4()}${safeExt}`);
-  },
-});
+// Use memoryStorage — file stored in req.file.buffer, no disk needed
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   if (ALLOWED_TYPES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error(`File type not allowed. Allowed: PDF, images, text files.`), false);
+    cb(new Error('File type not allowed. Allowed: PDF, images, text files.'), false);
   }
 };
 
@@ -49,8 +31,14 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: MAX_SIZE,
-    files: 1, // One file per request
+    files: 1,
   },
 });
 
-module.exports = { upload, UPLOAD_DIR };
+// Generate safe UUID filename for reference
+const generateFilename = (originalname) => {
+  const ext = path.extname(originalname).toLowerCase().replace(/[^a-z0-9.]/g, '');
+  return `${uuidv4()}${ext}`;
+};
+
+module.exports = { upload, generateFilename };
