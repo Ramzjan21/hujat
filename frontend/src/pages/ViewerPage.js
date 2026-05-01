@@ -159,21 +159,25 @@ export default function ViewerPage() {
 
   // ── Watermark overlay drawn directly on canvas ──────────────────────────────
   const drawWatermark = (canvas) => {
-    const ctx  = canvas.getContext('2d');
-    const text = `MAXFIY | CONFIDENTIAL`;
+    const ctx      = canvas.getContext('2d');
+    const text     = 'MAXFIY | CONFIDENTIAL';
+    const fontSize = Math.max(28, canvas.width / 18);
 
     ctx.save();
-    ctx.globalAlpha = 0.12;
-    ctx.fillStyle   = '#6366f1';
-    ctx.font        = `bold ${Math.max(18, canvas.width / 30)}px Arial`;
+    ctx.globalAlpha = 0.38;
+    ctx.fillStyle   = '#ef4444';
+    ctx.font        = `bold ${fontSize}px Arial`;
     ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
 
-    // Draw watermark diagonally at multiple positions
-    for (let y = -100; y < canvas.height + 200; y += 220) {
-      for (let x = -100; x < canvas.width + 200; x += 400) {
+    const stepX = canvas.width  / 2 + 60;
+    const stepY = canvas.height / 3 + 40;
+
+    for (let row = -1; row <= 4; row++) {
+      for (let col = -1; col <= 3; col++) {
         ctx.save();
-        ctx.translate(x + 200, y);
-        ctx.rotate(-Math.PI / 7);
+        ctx.translate(col * stepX + (row % 2 === 0 ? 0 : stepX / 2), row * stepY);
+        ctx.rotate(-Math.PI / 6);
         ctx.fillText(text, 0, 0);
         ctx.restore();
       }
